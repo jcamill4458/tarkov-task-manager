@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 
+# dataclass file
+# GameMap incomplete
+
 @dataclass
 class Objective:
     id: str
