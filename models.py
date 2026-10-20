@@ -31,3 +31,16 @@ class Trader:
 class GameMap:
     id: str
     name: str
+
+@dataclass
+class TaskProgress:
+    taskId: str
+    isStarred: bool = False
+    completeOverride: bool | None = None
+    counts: dict[str, int] = field(default_factory=dict)
+
+    def increment(self, objectiveId, amount=1):
+        self.counts[objectiveId] = max(0, self.counts.get(objectiveId, 0) + amount)
+
+    def decrement(self, objectiveId, amount=1):
+        self.increment(objectiveId, -amount)
