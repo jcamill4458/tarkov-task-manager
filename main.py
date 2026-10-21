@@ -3,9 +3,11 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QListWidge
 from tarkov.api_client import TarkovApiClient
 from tarkov.local_store import JsonStore
 from tarkov.tracker import TaskTracker
+from tarkov.ui.trader_tab import TraderTab
+
 
 def main():
-    # BUILDS
+    # builds
     client = TarkovApiClient()
     store = JsonStore("progress.json")
     tasks = client.fetchTasks()
@@ -13,16 +15,13 @@ def main():
     maps = client.fetchMaps()
     tracker = TaskTracker(tasks, store)
 
-    # base vars
+    # base Qt vars
     app = QApplication(sys.argv)
     tabs = QTabWidget()
 
-    # widget contents
+    # tab widget creation
     for trader in traders.values():
-        taskList = QListWidget()
-        taskNames = [task.name for task in tracker.allTasksForTrader(trader.id)]
-        taskList.addItems(taskNames)
-        tabs.addTab(taskList, trader.name)
+        tabs.addTab(TraderTab(trader, tracker), trader.name)
 
     # window
     window = QMainWindow()
