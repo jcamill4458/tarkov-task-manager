@@ -36,6 +36,7 @@ class GameMap:
 class TaskProgress:
     taskId: str
     isStarred: bool = False
+    isAvailable: bool = False
     completeOverride: bool | None = None
     counts: dict[str, int] = field(default_factory=dict)
 

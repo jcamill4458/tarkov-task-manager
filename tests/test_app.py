@@ -1,5 +1,5 @@
 """
-Tests for the Tarkov task tracker.
+Tests for the Tarkov task tracker, written by Claude
 
 Run from the project root (the folder with tracker.py) with:
 
@@ -70,6 +70,11 @@ def freshTracker(storePath):
     return TaskTracker(makeTasks(), JsonStore(storePath))
 
 
+def makeAvailable(tracker, *taskIds):
+    for taskId in taskIds:
+        tracker.toggleAvailable(taskId)
+
+
 # ---------------------------------------------------------------------------
 # TaskProgress
 # ---------------------------------------------------------------------------
@@ -77,6 +82,7 @@ def freshTracker(storePath):
 def test_progress_defaults():
     p = TaskProgress(taskId="x")
     assert p.isStarred is False
+    assert p.isAvailable is False
     assert p.completeOverride is None
     assert p.counts == {}
 
@@ -120,12 +126,50 @@ def test_save_then_load_round_trip(storePath):
     assert store.load() == records
 
 
+def test_isAvailable_survives_a_round_trip(storePath):
+    store = JsonStore(storePath)
+    store.save({"t1": TaskProgress(taskId="t1", isAvailable=True)})
+    assert store.load()["t1"].isAvailable is True
+
+
+def test_load_old_file_without_isAvailable(storePath):
+    storePath.write_text(
+        '{"t1": {"taskId": "t1", "isStarred": false, "completeOverride": null, "counts": {}}}'
+    )
+    assert JsonStore(storePath).load()["t1"].isAvailable is False
+
+
 def test_save_accepts_what_load_returns(storePath):
     store = JsonStore(storePath)
     store.save({"t1": TaskProgress(taskId="t1", isStarred=True)})
     loaded = store.load()
     store.save(loaded)
     assert store.load() == loaded
+
+
+def test_save_leaves_no_temp_file_behind(storePath):
+    store = JsonStore(storePath)
+    store.save({"t1": TaskProgress(taskId="t1", isStarred=True)})
+
+    filesInFolder = [p.name for p in storePath.parent.iterdir()]
+    assert filesInFolder == ["progress.json"]
+
+
+def test_save_replaces_the_old_contents(storePath):
+    store = JsonStore(storePath)
+    store.save({"t1": TaskProgress(taskId="t1", isStarred=True)})
+    store.save({"t2": TaskProgress(taskId="t2")})
+
+    assert list(store.load()) == ["t2"]
+
+
+def test_load_garbage_file_starts_fresh_and_keeps_the_bad_file(storePath):
+    storePath.write_text("{not json")
+
+    assert JsonStore(storePath).load() == {}
+    corrupt = storePath.with_name(storePath.name + ".corrupt")
+    assert corrupt.exists()
+    assert not storePath.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +181,40 @@ def test_progressFor_creates_a_record_once(tracker):
     assert tracker.progressFor("t1") is first
 
 
+def test_isAvailable_defaults_to_false_and_creates_no_record(tracker):
+    assert tracker.isAvailable("t1") is False
+    assert "t1" not in tracker.progress
+
+
+def test_isStarred_defaults_to_false_and_creates_no_record(tracker):
+    assert tracker.isStarred("t1") is False
+    assert "t1" not in tracker.progress
+
+
+def test_toggleAvailable_flips_and_persists(tracker, storePath):
+    tracker.toggleAvailable("t1")
+    assert tracker.isAvailable("t1") is True
+    assert freshTracker(storePath).isAvailable("t1") is True
+
+    tracker.toggleAvailable("t1")
+    assert freshTracker(storePath).isAvailable("t1") is False
+
+
+def test_making_a_task_unavailable_clears_its_star(tracker):
+    makeAvailable(tracker, "t1")
+    tracker.toggleStar("t1")
+    tracker.toggleAvailable("t1")
+    assert tracker.isStarred("t1") is False
+
+
+def test_toggleStar_needs_an_available_task_and_leaves_no_record(tracker):
+    with pytest.raises(ValueError):
+        tracker.toggleStar("t1")
+    assert "t1" not in tracker.progress
+
+
 def test_toggleStar_flips_and_persists(tracker, storePath):
+    makeAvailable(tracker, "t1")
     tracker.toggleStar("t1")
     assert tracker.progressFor("t1").isStarred is True
     assert freshTracker(storePath).progressFor("t1").isStarred is True
@@ -263,16 +340,19 @@ def test_setComplete_persists(tracker, storePath):
 # ---------------------------------------------------------------------------
 
 def test_tasksForTrader_filters_by_trader(tracker):
+    makeAvailable(tracker, "t1", "t2", "t3")
     ids = [t.id for t in tracker.tasksForTrader(TRADER_A)]
     assert sorted(ids) == ["t1", "t2"]
 
 
 def test_tasksForTrader_sorts_ignoring_case(tracker):
+    makeAvailable(tracker, "t1", "t2")
     names = [t.name for t in tracker.tasksForTrader(TRADER_A)]
     assert names == ["bravo", "Yankee"]
 
 
 def test_tasksForTrader_can_hide_tasks_completed_by_override(tracker):
+    makeAvailable(tracker, "t1", "t2")
     tracker.setComplete("t1", True)
     shown = [t.id for t in tracker.tasksForTrader(TRADER_A, includeCompleted=False)]
     assert shown == ["t2"]
@@ -281,6 +361,7 @@ def test_tasksForTrader_can_hide_tasks_completed_by_override(tracker):
 
 
 def test_tasksForTrader_can_hide_tasks_completed_by_counting(tracker):
+    makeAvailable(tracker, "t1", "t2")
     tracker.updateProgress("t2", "o4", 1)
     shown = [t.id for t in tracker.tasksForTrader(TRADER_A, includeCompleted=False)]
     assert shown == ["t1"]
@@ -288,6 +369,37 @@ def test_tasksForTrader_can_hide_tasks_completed_by_counting(tracker):
 
 def test_tasksForTrader_unknown_trader_is_empty(tracker):
     assert tracker.tasksForTrader("nobody") == []
+
+
+def test_tasksForTrader_shows_only_available_tasks(tracker):
+    assert tracker.tasksForTrader(TRADER_A) == []
+    makeAvailable(tracker, "t1")
+    assert [t.id for t in tracker.tasksForTrader(TRADER_A)] == ["t1"]
+
+
+def test_tasksForTrader_puts_starred_first(tracker):
+    makeAvailable(tracker, "t1", "t2")
+    assert [t.name for t in tracker.tasksForTrader(TRADER_A)] == ["bravo", "Yankee"]
+    tracker.toggleStar("t1")
+    assert [t.name for t in tracker.tasksForTrader(TRADER_A)] == ["Yankee", "bravo"]
+
+
+# ---------------------------------------------------------------------------
+# TaskTracker: allTasksForTrader (feeds the dropdown)
+# ---------------------------------------------------------------------------
+
+def test_allTasksForTrader_ignores_availability_and_stars(tracker):
+    names = [t.name for t in tracker.allTasksForTrader(TRADER_A)]
+    assert names == ["bravo", "Yankee"]
+
+    makeAvailable(tracker, "t1")
+    tracker.toggleStar("t1")
+    names = [t.name for t in tracker.allTasksForTrader(TRADER_A)]
+    assert names == ["bravo", "Yankee"]          # stays alphabetical
+
+
+def test_allTasksForTrader_unknown_trader_is_empty(tracker):
+    assert tracker.allTasksForTrader("nobody") == []
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +414,7 @@ needsStarred = pytest.mark.skipif(
 
 @needsStarred
 def test_starredTasks_returns_only_starred_sorted(tracker):
+    makeAvailable(tracker, "t1", "t3")
     tracker.toggleStar("t1")
     tracker.toggleStar("t3")
     names = [t.name for t in tracker.starredTasks()]
@@ -311,17 +424,20 @@ def test_starredTasks_returns_only_starred_sorted(tracker):
 @needsStarred
 def test_starredTasks_ignores_ids_that_are_not_in_tasks(tracker):
     tracker.progress["ghost"] = TaskProgress(taskId="ghost", isStarred=True)
+    makeAvailable(tracker, "t1")
     tracker.toggleStar("t1")
     assert [t.id for t in tracker.starredTasks()] == ["t1"]
 
 
 @needsStarred
 def test_starredTasks_can_hide_completed(tracker):
+    makeAvailable(tracker, "t1", "t2")
     tracker.toggleStar("t1")
     tracker.toggleStar("t2")
     tracker.setComplete("t1", True)
     shown = [t.id for t in tracker.starredTasks(includeCompleted=False)]
     assert shown == ["t2"]
+
 
 # ---------------------------------------------------------------------------
 # TaskTracker: tasksForMap
@@ -352,6 +468,7 @@ def test_tasksForMap_unknown_map_is_empty(tracker):
 def test_tasks_without_a_map_match_no_map(tracker):
     for mapId in ("m-customs", "m-woods"):
         assert "t3" not in [t.id for t in tracker.tasksForMap(mapId)]
+
 
 # ---------------------------------------------------------------------------
 # api_client builders (raw API dictionaries in, clean objects out)
@@ -534,3 +651,37 @@ def test_fetchMaps_keys_by_id(monkeypatch):
     fake = TarkovApiClient()
     monkeypatch.setattr(fake, "fetchData", fakeFetch)
     assert fake.fetchMaps() == {"m1": GameMap(id="m1", name="Customs")}
+
+class FakeResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self.payload
+
+def test_fetchData_writes_a_cache_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("tarkov.api_client.requests.get",
+                        lambda url, timeout: FakeResponse({"data": {"a": 1}}))
+    client = TarkovApiClient(cacheDir=tmp_path / "cache")
+
+    assert client.fetchData("tasks") == {"a": 1}
+    assert (tmp_path / "cache" / "tasks.json").exists()
+
+def test_fetchData_second_call_skips_the_network(tmp_path, monkeypatch):
+    calls = []
+
+    def fakeGet(url, timeout):
+        calls.append(url)
+        return FakeResponse({"data": {"a": 1}})
+
+    monkeypatch.setattr("tarkov.api_client.requests.get", fakeGet)
+    client = TarkovApiClient(cacheDir=tmp_path / "cache")
+
+    first = client.fetchData("tasks")
+    second = client.fetchData("tasks")
+
+    assert first == second == {"a": 1}
+    assert len(calls) == 1

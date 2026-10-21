@@ -13,7 +13,8 @@ __pycache__/
 
 # Your own data (progress, caches, test files)
 *.json
-explore_api.py
+cache/
+scratchpad/
 
 # OS files
 .DS_Store

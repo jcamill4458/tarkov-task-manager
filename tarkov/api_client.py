@@ -1,4 +1,4 @@
-import requests
+import requests, json, os
 from tarkov.models import Objective, Task, Trader, GameMap
 
 # base of json file we pull from
@@ -24,15 +24,24 @@ TRADER_IDS = [
 
 # API client class
 class TarkovApiClient:
-    def __init__(self, gameMode="pve"):
+    def __init__(self, gameMode="pve", cacheDir="cache"):
         self.gameMode = gameMode
+        self.cacheDir = cacheDir
 
     # json data fetcher, unspecified
     def fetchData(self, endpoint):
+        cachePath = os.path.join(self.cacheDir, f"{endpoint}.json")
+        if os.path.exists(cachePath):
+            with open(cachePath) as f:
+                return json.load(f)
         url = f"{BASE_URL}/{self.gameMode}/{endpoint}"
         response = requests.get(url, timeout=30)
         response.raise_for_status()
-        return response.json()["data"]
+        data = response.json()["data"]
+        os.makedirs(self.cacheDir, exist_ok=True)
+        with open(cachePath, "w") as f:
+            json.dump(data, f)
+        return data
 
     # fetch data from tasks dataset and tasks english translation dataset
     def fetchTasks(self):

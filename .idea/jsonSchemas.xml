@@ -14,6 +14,9 @@
                   <Item>
                     <option name="path" value="tasks.json" />
                   </Item>
+                  <Item>
+                    <option name="path" value="scratchpad/cache/tasks.json" />
+                  </Item>
                 </list>
               </option>
             </SchemaInfo>

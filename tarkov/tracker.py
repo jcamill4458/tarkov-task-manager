@@ -12,8 +12,17 @@ class TaskTracker:
         return self.progress[taskId]
 
     def toggleStar(self, taskId):
+        if not self.isAvailable(taskId):
+            raise ValueError(f"Task {taskId} not available")
         record = self.progressFor(taskId)
         record.isStarred = not record.isStarred
+        self.store.save(self.progress)
+
+    def toggleAvailable(self, taskId):
+        record = self.progressFor(taskId)
+        record.isAvailable = not record.isAvailable
+        if not record.isAvailable:
+            record.isStarred = False
         self.store.save(self.progress)
 
     def isCompleted(self, taskId):
@@ -34,6 +43,18 @@ class TaskTracker:
                 return False
 
         return True
+
+    def isAvailable(self, taskId):
+        progress = self.progress.get(taskId)
+        if progress is None:
+            return False
+        return progress.isAvailable
+
+    def isStarred(self, taskId):
+        progress = self.progress.get(taskId)
+        if progress is None:
+            return False
+        return progress.isStarred
 
     def updateProgress(self, taskId, objectiveId, change):
         task = self.tasks[taskId]
@@ -69,12 +90,12 @@ class TaskTracker:
         for task in tasks:
             if includeCompleted or not self.isCompleted(task.id):
                 filteredTasks.append(task)
-        return sorted(filteredTasks, key=lambda t: t.name.lower())
+        return sorted(filteredTasks, key=lambda t: (not self.isStarred(t.id), t.name.lower()))
 
     def tasksForTrader(self, traderId, includeCompleted=True):
         traderTasks = []
         for task in self.tasks.values():
-            if task.traderId in traderId:
+            if task.traderId == traderId and self.isAvailable(task.id):
                 traderTasks.append(task)
         return self._filterAndSort(traderTasks, includeCompleted)
 
@@ -93,3 +114,10 @@ class TaskTracker:
                 if task is not None:
                     starred.append(task)
         return self._filterAndSort(starred, includeCompleted)
+
+    def allTasksForTrader(self, traderId):
+        allTasks = []
+        for task in self.tasks.values():
+            if task.traderId == traderId:
+                allTasks.append(task)
+        return sorted(allTasks, key=lambda t: t.name.lower())
