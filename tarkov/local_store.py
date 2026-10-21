@@ -1,4 +1,4 @@
-import json
+import json, os
 from dataclasses import asdict
 from tarkov.models import TaskProgress
 
@@ -13,14 +13,20 @@ class JsonStore:
             d = asdict(t)
             saved[d["taskId"]] = d
 
-        with open(self.filePath, "w") as f:
+        tempFile = str(self.filePath) + ".tmp"
+        with open(tempFile, "w") as f:
             json.dump(saved, f, indent=2)
+
+        os.replace(tempFile, self.filePath)
 
     def load(self):
         try:
             with open(self.filePath) as f:
                 back = json.load(f)
         except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError:
+            os.replace(self.filePath, str(self.filePath) + ".corrupt")
             return {}
 
         rebuilt = {}
