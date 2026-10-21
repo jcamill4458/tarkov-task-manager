@@ -1,4 +1,4 @@
-from models import TaskProgress
+from tarkov.models import TaskProgress
 
 class TaskTracker:
     def __init__(self, tasks, store):
@@ -63,3 +63,23 @@ class TaskTracker:
                 record.counts[objective.id] = objective.target
 
         self.store.save(self.progress)
+
+    def tasksForTrader(self, traderId, includeCompleted=True):
+        traderTasks = []
+        for task in self.tasks.values():
+            if task.traderId != traderId:
+                continue
+            if includeCompleted or not self.isCompleted(task.id):
+                traderTasks.append(task)
+        return sorted(traderTasks, key=lambda t: t.name.lower())
+
+    def starredTasks(self, includeCompleted=True):
+        starred = []
+        for record in self.progress.values():
+            if record.isStarred:
+                task = self.tasks.get(record.taskId)
+                if task is None:
+                    continue
+                if includeCompleted or not self.isCompleted(task.id):
+                    starred.append(task)
+        return sorted(starred, key=lambda t: t.name.lower())

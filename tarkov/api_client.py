@@ -1,5 +1,5 @@
 import requests
-from models import Objective, Task, Trader, GameMap
+from tarkov.models import Objective, Task, Trader, GameMap
 
 # base of json file we pull from
 BASE_URL = "https://json.tarkov.dev"

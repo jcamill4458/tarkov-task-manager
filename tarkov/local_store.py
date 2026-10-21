@@ -1,6 +1,6 @@
 import json
 from dataclasses import asdict
-from models import TaskProgress
+from tarkov.models import TaskProgress
 
 
 class JsonStore:
