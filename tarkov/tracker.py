@@ -64,22 +64,32 @@ class TaskTracker:
 
         self.store.save(self.progress)
 
+    def _filterAndSort(self, tasks, includeCompleted):
+        filteredTasks = []
+        for task in tasks:
+            if includeCompleted or not self.isCompleted(task.id):
+                filteredTasks.append(task)
+        return sorted(filteredTasks, key=lambda t: t.name.lower())
+
     def tasksForTrader(self, traderId, includeCompleted=True):
         traderTasks = []
         for task in self.tasks.values():
-            if task.traderId != traderId:
-                continue
-            if includeCompleted or not self.isCompleted(task.id):
+            if task.traderId in traderId:
                 traderTasks.append(task)
-        return sorted(traderTasks, key=lambda t: t.name.lower())
+        return self._filterAndSort(traderTasks, includeCompleted)
+
+    def tasksForMap(self, mapId, includeCompleted=True):
+        mapTasks = []
+        for task in self.tasks.values():
+            if mapId in task.mapIds:
+                mapTasks.append(task)
+        return self._filterAndSort(mapTasks, includeCompleted)
 
     def starredTasks(self, includeCompleted=True):
         starred = []
         for record in self.progress.values():
             if record.isStarred:
                 task = self.tasks.get(record.taskId)
-                if task is None:
-                    continue
-                if includeCompleted or not self.isCompleted(task.id):
+                if task is not None:
                     starred.append(task)
-        return sorted(starred, key=lambda t: t.name.lower())
+        return self._filterAndSort(starred, includeCompleted)

@@ -32,6 +32,7 @@ def makeTasks():
     """
     yankee = Task(
         id="t1", name="Yankee", traderId=TRADER_A, wikiUrl="",
+        mapIds=["m-customs"],
         objectives=[
             Objective(id="o1", description="Visit the place", objType="visit", target=1),
             Objective(id="o2", description="Hand over items", objType="giveItem", target=3),
@@ -40,6 +41,7 @@ def makeTasks():
     )
     bravo = Task(
         id="t2", name="bravo", traderId=TRADER_A, wikiUrl="",
+        mapIds=["m-customs", "m-woods"],
         objectives=[
             Objective(id="o4", description="Find it", objType="findItem", target=1),
         ],
@@ -289,7 +291,7 @@ def test_tasksForTrader_unknown_trader_is_empty(tracker):
 
 
 # ---------------------------------------------------------------------------
-# TaskTracker: starredTasks (skipped until the method exists)
+# TaskTracker: starredTasks
 # ---------------------------------------------------------------------------
 
 needsStarred = pytest.mark.skipif(
@@ -321,6 +323,35 @@ def test_starredTasks_can_hide_completed(tracker):
     shown = [t.id for t in tracker.starredTasks(includeCompleted=False)]
     assert shown == ["t2"]
 
+# ---------------------------------------------------------------------------
+# TaskTracker: tasksForMap
+# ---------------------------------------------------------------------------
+
+def test_tasksForMap_filters_by_map(tracker):
+    customs = [t.id for t in tracker.tasksForMap("m-customs")]
+    woods = [t.id for t in tracker.tasksForMap("m-woods")]
+    assert sorted(customs) == ["t1", "t2"]
+    assert woods == ["t2"]
+
+
+def test_tasksForMap_sorts_ignoring_case(tracker):
+    names = [t.name for t in tracker.tasksForMap("m-customs")]
+    assert names == ["bravo", "Yankee"]
+
+
+def test_tasksForMap_can_hide_completed(tracker):
+    tracker.setComplete("t1", True)
+    shown = [t.id for t in tracker.tasksForMap("m-customs", includeCompleted=False)]
+    assert shown == ["t2"]
+
+
+def test_tasksForMap_unknown_map_is_empty(tracker):
+    assert tracker.tasksForMap("nowhere") == []
+
+
+def test_tasks_without_a_map_match_no_map(tracker):
+    for mapId in ("m-customs", "m-woods"):
+        assert "t3" not in [t.id for t in tracker.tasksForMap(mapId)]
 
 # ---------------------------------------------------------------------------
 # api_client builders (raw API dictionaries in, clean objects out)
