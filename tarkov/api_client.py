@@ -1,5 +1,5 @@
 import requests, json, os
-from tarkov.models import Objective, Task, Trader, GameMap
+from tarkov.models import Objective, Task, Trader, GameMap, Extract, Transit
 
 # base of json file we pull from
 BASE_URL = "https://json.tarkov.dev"
@@ -71,6 +71,8 @@ class TarkovApiClient:
         mapNames = self.fetchData("maps_en")
         mapsById = {}
         for eachMap in mapData["maps"].values():
+            if eachMap["id"] in DISPLAY_MAP.keys():
+                continue
             mapsById[eachMap["id"]] = self.buildMap(eachMap, mapNames)
         return mapsById
 
@@ -79,9 +81,30 @@ class TarkovApiClient:
     def displayMap(mapId):
         return DISPLAY_MAP.get(mapId, mapId)
 
-    # builds map dataclass (incomplete)
+    # builds extract dataclass
+    def buildExtract(self, raw, names):
+        position = raw.get("position") or {}
+        return Extract(id=raw["id"], name=names.get(raw["name"]) or "Unknown extract", faction=raw.get("faction") or "unknown",
+                       x=position.get("x") or 0, y=position.get("y") or 0, z=position.get("z") or 0)
+
+    # builds transit dataclass
+    def buildTransit(self, raw, names):
+        position = raw.get("position") or {}
+        return Transit(id=raw["id"], description=names.get(raw.get("description")) or "Unknown transit",
+                       destinationMapId=self.displayMap(raw.get("map")) or "", x=position.get("x") or 0, y=position.get("y") or 0, z=position.get("z") or 0)
+
+    # builds map dataclass
     def buildMap(self, raw, mapNames):
-        return GameMap(id=raw["id"], name=mapNames.get(raw["name"]) or "Unknown map")
+        extractList = []
+        transitList = []
+        for eachExtract in raw.get("extracts") or []:
+            # exclude shared extracts
+            if eachExtract.get("faction") == "shared":
+                continue
+            extractList.append(self.buildExtract(eachExtract, mapNames))
+        for eachTransit in raw.get("transits") or []:
+            transitList.append(self.buildTransit(eachTransit, mapNames))
+        return GameMap(id=raw["id"], name=mapNames.get(raw["name"]) or "Unknown map", extracts=extractList, transits=transitList)
 
     # builds trader dataclass
     def buildTrader(self, raw, traderNames):

@@ -15,6 +15,7 @@ class TraderTab(QWidget):
         self.taskList = QListWidget()
         self.showCompleted = QCheckBox("Show Completed")
         self.tasksButton = QToolButton()
+        self.menu = QMenu()
         self.action = QAction()
         self.action.setShortcut(QKeySequence("t"))
         self.action.triggered.connect(self.tasksButton.showMenu)
@@ -77,13 +78,12 @@ class TraderTab(QWidget):
         self.setLayout(layout)
 
     def buildTasksMenu(self):
-        menu = QMenu(self)
         for task in self.tracker.allTasksForTrader(self.trader.id):
-            action = menu.addAction(task.name)
+            action = self.menu.addAction(task.name)
             action.setCheckable(True)
             action.setChecked(self.tracker.isAvailable(task.id))
             action.toggled.connect(lambda checked, taskId=task.id: self.onTaskToggled(taskId))
-        self.tasksButton.setMenu(menu)
+        self.tasksButton.setMenu(self.menu)
         self.tasksButton.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
     def onTaskToggled(self, taskId):

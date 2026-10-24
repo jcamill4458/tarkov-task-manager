@@ -28,9 +28,29 @@ class Trader:
     imageUrl: str = ""
 
 @dataclass
+class Extract:
+    id: str
+    name: str
+    faction: str
+    x: float
+    y: float
+    z: float
+
+@dataclass
+class Transit:
+    id: str
+    description: str
+    destinationMapId: str
+    x: float
+    y: float
+    z: float
+
+@dataclass
 class GameMap:
     id: str
     name: str
+    extracts: list[Extract] = field(default_factory=list)
+    transits: list[Transit] = field(default_factory=list)
 
 @dataclass
 class TaskProgress:

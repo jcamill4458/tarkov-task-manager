@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QListWidge
 from tarkov.api_client import TarkovApiClient
 from tarkov.local_store import JsonStore
 from tarkov.tracker import TaskTracker
+from tarkov.ui.maps_tab import MapsTab
 from tarkov.ui.trader_tab import TraderTab
 
 def main():
@@ -27,6 +28,7 @@ def main():
     # tab widget creation
     for trader in traders.values():
         tabs.addTab(TraderTab(trader, tracker), trader.name)
+    tabs.addTab(MapsTab(maps), "Maps")
 
     # window
     window = QMainWindow()

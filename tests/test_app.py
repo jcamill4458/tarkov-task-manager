@@ -12,7 +12,7 @@ import pytest
 
 from tarkov.api_client import TarkovApiClient
 from tarkov.local_store import JsonStore
-from tarkov.models import GameMap, Objective, Task, TaskProgress, Trader
+from tarkov.models import GameMap, Objective, Task, TaskProgress, Trader, Extract, Transit
 from tarkov.tracker import TaskTracker
 
 
@@ -503,6 +503,52 @@ LOOKUP = {"desc-key": "Do the thing", "empty-key": "", "task-key": "My Task"}
 # Creating a client does no network work. Only the fetch methods do.
 client = TarkovApiClient()
 
+RAW_EXTRACT = {"id": "e1", "name": "ex-key", "faction": "pmc",
+               "position": {"x": 1.5, "y": 2.5, "z": 3.5}}
+RAW_TRANSIT = {"id": "9", "description": "tr-key", "map": NIGHT_FACTORY,
+               "position": {"x": 4.0, "y": 5.0, "z": 6.0}}
+NAMES = {"ex-key": "Crossroads", "tr-key": "Transit to Factory", "map-key": "Customs"}
+
+
+def test_buildExtract_reads_the_nested_position():
+    extract = client.buildExtract(RAW_EXTRACT, NAMES)
+    assert extract == Extract(id="e1", name="Crossroads", faction="pmc", x=1.5, y=2.5, z=3.5)
+
+
+def test_buildExtract_fallbacks():
+    extract = client.buildExtract({"id": "e1", "name": "nope"}, {})
+    assert extract.name == "Unknown extract"
+    assert extract.faction == "unknown"
+    assert (extract.x, extract.y, extract.z) == (0, 0, 0)
+
+
+def test_buildTransit_translates_the_destination_map():
+    transit = client.buildTransit(RAW_TRANSIT, NAMES)
+    assert transit.description == "Transit to Factory"
+    assert transit.destinationMapId == FACTORY
+    assert (transit.x, transit.y, transit.z) == (4.0, 5.0, 6.0)
+
+
+def test_buildTransit_fallbacks():
+    transit = client.buildTransit({"id": "9"}, {})
+    assert transit.description == "Unknown transit"
+    assert transit.destinationMapId == ""
+
+
+def test_buildMap_keeps_extracts_and_transits_but_skips_shared():
+    raw = {"id": "m1", "name": "map-key",
+           "extracts": [RAW_EXTRACT, dict(RAW_EXTRACT, id="e2", faction="shared")],
+           "transits": [RAW_TRANSIT]}
+    gameMap = client.buildMap(raw, NAMES)
+    assert gameMap.name == "Customs"
+    assert [e.id for e in gameMap.extracts] == ["e1"]
+    assert len(gameMap.transits) == 1
+
+
+def test_buildMap_without_extracts_or_transits_has_empty_lists():
+    gameMap = client.buildMap({"id": "m1", "name": "map-key"}, NAMES)
+    assert gameMap.extracts == []
+    assert gameMap.transits == []
 
 def rawObjective(**overrides):
     raw = {
@@ -668,6 +714,19 @@ def test_fetchMaps_keys_by_id(monkeypatch):
     fake = TarkovApiClient()
     monkeypatch.setattr(fake, "fetchData", fakeFetch)
     assert fake.fetchMaps() == {"m1": GameMap(id="m1", name="Customs")}
+
+def test_fetchMaps_skips_the_display_variants(monkeypatch):
+    def fakeFetch(endpoint):
+        if endpoint == "maps":
+            return {"maps": {
+                "a": {"id": NIGHT_FACTORY, "name": "k"},
+                "b": {"id": FACTORY, "name": "k"},
+            }}
+        return {"k": "Factory"}
+
+    fake = TarkovApiClient()
+    monkeypatch.setattr(fake, "fetchData", fakeFetch)
+    assert list(fake.fetchMaps()) == [FACTORY]
 
 class FakeResponse:
     def __init__(self, payload):
