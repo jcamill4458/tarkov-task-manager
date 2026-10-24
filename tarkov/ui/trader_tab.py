@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QAction, QKeySequence
 from PySide6.QtWidgets import (QWidget, QListWidget, QCheckBox, QToolButton, QHBoxLayout, QVBoxLayout, QMenu, QLabel,
                                QListWidgetItem, QPushButton)
+from tarkov.ui.objective_row import ObjectiveRow
 
 class TraderTab(QWidget):
     def __init__(self, trader, tracker):
@@ -14,10 +15,14 @@ class TraderTab(QWidget):
         self.taskList = QListWidget()
         self.showCompleted = QCheckBox("Show Completed")
         self.tasksButton = QToolButton()
+        self.action = QAction()
+        self.action.setShortcut(QKeySequence("t"))
+        self.action.triggered.connect(self.tasksButton.showMenu)
+        self.tasksButton.setDefaultAction(self.action)
         self.tasksButton.setText("Tasks ")
         # right widgets
         self.titleLabel = QLabel("Select a task")
-        self.starButton = QPushButton("★")
+        self.starButton = QPushButton("☆")
         self.starButton.setEnabled(False)
         self.starButton.setStyleSheet("padding: 3px; margin: 3px;")
         self.wikiButton = QPushButton("Wiki")
@@ -25,6 +30,7 @@ class TraderTab(QWidget):
         self.wikiButton.setStyleSheet("padding: 3px; margin: 2px;")
         self.completeButton = QPushButton("Mark complete")
         self.completeButton.setEnabled(False)
+        self.objectivesLayout = QVBoxLayout()
 
         # connectors
         self.showCompleted.toggled.connect(self.refreshList)
@@ -57,6 +63,8 @@ class TraderTab(QWidget):
         topRow.addWidget(self.wikiButton)
         topRow.addWidget(self.completeButton)
         rightLayout.addLayout(topRow)
+        rightLayout.addLayout(self.objectivesLayout)
+        rightLayout.addStretch(1)
         return rightLayout
 
 
@@ -100,6 +108,10 @@ class TraderTab(QWidget):
         self.tracker.setComplete(self.currentTaskId, not done)
         self.refreshList()
 
+    def onObjectiveChanged(self, objectiveId, change):
+        self.tracker.updateProgress(self.currentTaskId, objectiveId, change)
+        self.refreshList()
+
     def updateDetail(self):
         task = self.tracker.tasks[self.currentTaskId]
         self.titleLabel.setText(task.name)
@@ -108,6 +120,11 @@ class TraderTab(QWidget):
         self.starButton.setText("★" if self.tracker.isStarred(task.id) else "☆")
         self.completeButton.setEnabled(True)
         self.completeButton.setText("Mark incomplete" if self.tracker.isCompleted(task.id) else "Mark complete")
+        self.clearObjectives()
+        for objective in task.objectives:
+            count = self.tracker.countFor(task.id, objective.id)
+            row = ObjectiveRow(objective, count, self.onObjectiveChanged)
+            self.objectivesLayout.addWidget(row)
 
     def clearDetail(self):
         self.currentTaskId = None
@@ -115,6 +132,14 @@ class TraderTab(QWidget):
         self.starButton.setEnabled(False)
         self.wikiButton.setEnabled(False)
         self.completeButton.setEnabled(False)
+        self.clearObjectives()
+
+    def clearObjectives(self):
+        while self.objectivesLayout.count():
+            item = self.objectivesLayout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
     def refreshList(self):
         selectedId = self.currentTaskId
@@ -123,7 +148,8 @@ class TraderTab(QWidget):
         tasks = self.tracker.tasksForTrader(self.trader.id, self.showCompleted.isChecked())
         found = False
         for task in tasks:
-            item = QListWidgetItem(task.name)
+            text = f"{task.name} ★" if self.tracker.isStarred(task.id) else task.name
+            item = QListWidgetItem(text)
             item.setData(Qt.ItemDataRole.UserRole, task.id)
             self.taskList.addItem(item)
             if task.id == selectedId:

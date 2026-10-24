@@ -10,7 +10,7 @@ DISPLAY_MAP = {
     "59fc81d786f774390775787e" : "55f2d3fd4bdc2d5f408b4567", # Night Factory
     "6a294a5b5eb5f9a1700417b7" : "5b0fc42d86f7744a585f9105" # The Lab (Dark)
 }
-# the traders I want included, moved off API later
+# the traders I want included
 # maybe add the other couple later
 TRADER_IDS = [
 "54cb50c76803fa8b248b4571", #Prapor

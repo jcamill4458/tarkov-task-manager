@@ -223,6 +223,16 @@ def test_toggleStar_flips_and_persists(tracker, storePath):
     assert freshTracker(storePath).progressFor("t1").isStarred is False
 
 
+def test_countFor_defaults_to_zero_and_creates_no_record(tracker):
+    assert tracker.countFor("t1", "o2") == 0
+    assert "t1" not in tracker.progress
+
+
+def test_countFor_reads_the_saved_count(tracker):
+    tracker.updateProgress("t1", "o2", 2)
+    assert tracker.countFor("t1", "o2") == 2
+    assert tracker.countFor("t1", "o1") == 0      # no count saved for this one yet
+
 # ---------------------------------------------------------------------------
 # TaskTracker: completion
 # ---------------------------------------------------------------------------
@@ -273,6 +283,13 @@ def test_clearing_override_returns_to_the_counts(tracker):
 # ---------------------------------------------------------------------------
 # TaskTracker: updateProgress
 # ---------------------------------------------------------------------------
+
+def test_updateProgress_hands_control_back_to_the_counts(tracker):
+    tracker.setComplete("t1", True)
+    tracker.updateProgress("t1", "o2", -1)
+    assert tracker.isCompleted("t1") is False
+    tracker.updateProgress("t1", "o2", 1)
+    assert tracker.isCompleted("t1") is True
 
 def test_updateProgress_caps_at_target(tracker):
     for _ in range(5):

@@ -44,6 +44,12 @@ class TaskTracker:
 
         return True
 
+    def countFor(self, taskId, objectiveId):
+        progress = self.progress.get(taskId)
+        if progress is None:
+            return 0
+        return progress.counts.get(objectiveId, 0)
+
     def isAvailable(self, taskId):
         progress = self.progress.get(taskId)
         if progress is None:
@@ -70,6 +76,7 @@ class TaskTracker:
         record = self.progressFor(taskId)
         record.increment(objectiveId, change)
         record.counts[objectiveId] = min(target, record.counts[objectiveId])
+        record.completeOverride = None
         self.store.save(self.progress)
 
     def setComplete(self, taskId, status):
