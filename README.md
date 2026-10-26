@@ -19,3 +19,5 @@ First launch downloads data from tarkov.dev (needs internet), cache, progress an
 - Task, map and extract data: [tarkov.dev](https://tarkov.dev)
 - Map images: [tarkov-dev-svg-maps](https://github.com/the-hideout/tarkov-dev-svg-maps/) (CC BY-NC-SA 4.0, non-commercial use only)
 - Satellite imagery: tiles from tarkov.dev (downloaded on demand)
+
+Not affiliated with Battlestate Games.
