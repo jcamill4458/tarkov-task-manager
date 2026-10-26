@@ -1,5 +1,5 @@
 @echo off
-rem Builds the app into dist\TarkovTaskManager\
+rem Builds the app into .exe in folder TarkovTaskManager
 
 python -m pip install pyinstaller
 if errorlevel 1 goto failed
