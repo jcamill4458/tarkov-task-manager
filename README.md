@@ -9,9 +9,11 @@ A simple desktop app for tracking & managing Escape from Tarkov tasks and viewin
 - Create your own pins on any individual tasks' map, which carry over to the larger map view
 
 ## Running it
-1. Install Python 3.12 or newer
+1. Install Python
 2. `pip install PySide6 requests platformdirs`
 3. `python main.py`
+   OR
+build .exe with build file
 
 First launch downloads data from tarkov.dev (needs internet), cache, progress and satellite tiles are saved in the local APPDATA folder
 
