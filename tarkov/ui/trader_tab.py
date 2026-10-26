@@ -2,15 +2,23 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QAction, QKeySequence
 from PySide6.QtWidgets import (QWidget, QListWidget, QCheckBox, QToolButton, QHBoxLayout, QVBoxLayout, QMenu, QLabel,
                                QListWidgetItem, QPushButton)
+from tarkov.objective_map import objectiveColor, taskMaps
 from tarkov.ui.objective_row import ObjectiveRow
+from tarkov.ui.task_map import TaskMapView
 
 class TraderTab(QWidget):
-    def __init__(self, trader, tracker):
+    def __init__(self, trader, tracker, maps=None, mapConfigs=None, tileDir=None, pinBook=None):
         super().__init__()
         # important
         self.trader = trader
         self.tracker = tracker
+        self.maps = maps
+        self.mapConfigs = mapConfigs
+        self.tileDir = tileDir
+        self.pinBook = pinBook
         self.currentTaskId = None
+        self.selectedObjectiveId = None
+        self.taskMap = None
         # left widgets
         self.taskList = QListWidget()
         self.showCompleted = QCheckBox("Show Completed")
@@ -32,6 +40,7 @@ class TraderTab(QWidget):
         self.completeButton = QPushButton("Mark complete")
         self.completeButton.setEnabled(False)
         self.objectivesLayout = QVBoxLayout()
+        self.mapSlot = QVBoxLayout()
 
         # connectors
         self.showCompleted.toggled.connect(self.refreshList)
@@ -65,7 +74,7 @@ class TraderTab(QWidget):
         topRow.addWidget(self.completeButton)
         rightLayout.addLayout(topRow)
         rightLayout.addLayout(self.objectivesLayout)
-        rightLayout.addStretch(1)
+        rightLayout.addLayout(self.mapSlot, 1)    # the task's map takes the rest of the room
         return rightLayout
 
 
@@ -92,7 +101,10 @@ class TraderTab(QWidget):
 
     def onTaskSelected(self, current, previous):
         if current is None: return
-        self.currentTaskId = current.data(Qt.ItemDataRole.UserRole)
+        taskId = current.data(Qt.ItemDataRole.UserRole)
+        if taskId != self.currentTaskId:
+            self.selectedObjectiveId = None
+        self.currentTaskId = taskId
         self.updateDetail()
 
     def openWiki(self):
@@ -121,13 +133,37 @@ class TraderTab(QWidget):
         self.completeButton.setEnabled(True)
         self.completeButton.setText("Mark incomplete" if self.tracker.isCompleted(task.id) else "Mark complete")
         self.clearObjectives()
-        for objective in task.objectives:
+        for number, objective in enumerate(task.objectives):
             count = self.tracker.countFor(task.id, objective.id)
-            row = ObjectiveRow(objective, count, self.onObjectiveChanged)
+            row = ObjectiveRow(objective, count, self.onObjectiveChanged, self.onObjectiveSelected,
+                               objectiveColor(number), objective.id == self.selectedObjectiveId)
             self.objectivesLayout.addWidget(row)
+        self.showTaskMap(task)
+
+    def showTaskMap(self, task):
+        if self.maps is None:
+            return
+        if self.taskMap is None:
+            if not taskMaps(task, self.maps):
+                return
+            self.taskMap = TaskMapView(self.maps, self.mapConfigs, self.tileDir, self.pinBook)
+            self.mapSlot.addWidget(self.taskMap)
+        self.taskMap.setVisible(self.taskMap.showTask(task, self.selectedObjectiveId))
+
+    def onObjectiveSelected(self, objectiveId):
+        self.selectedObjectiveId = objectiveId
+        for number in range(self.objectivesLayout.count()):
+            row = self.objectivesLayout.itemAt(number).widget()
+            if row is not None:
+                row.setSelected(row.objective.id == objectiveId)
+        if self.taskMap is not None and not self.taskMap.isHidden():
+            self.taskMap.selectObjective(objectiveId)
 
     def clearDetail(self):
         self.currentTaskId = None
+        self.selectedObjectiveId = None
+        if self.taskMap is not None:
+            self.taskMap.hide()
         self.titleLabel.setText("Select a task")
         self.starButton.setEnabled(False)
         self.wikiButton.setEnabled(False)

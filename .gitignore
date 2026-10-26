@@ -8,11 +8,17 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Build output (see build.bat)
+build/
+dist/
+*.spec
+
 # PyCharm
 .idea/
 
-# Your own data (progress, caches, test files)
+# Data (progress, caches, test files)
 *.json
+!assets/mapConfig.json
 cache/
 scratchpad/
 

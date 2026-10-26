@@ -1,6 +1,7 @@
 from pathlib import Path
 
 MAP_DIR = Path(__file__).resolve().parent.parent / "assets" / "maps"
+MAP_CONFIG = MAP_DIR.parent / "mapConfig.json"
 
 MAP_FILES = {
     "Customs" : "Customs.svg",

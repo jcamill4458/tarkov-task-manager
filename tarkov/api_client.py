@@ -1,5 +1,5 @@
 import requests, json, os
-from tarkov.models import Objective, Task, Trader, GameMap, Extract, Transit
+from tarkov.models import Objective, ObjectiveLocation, Task, Trader, GameMap, Extract, Transit
 
 # base of json file we pull from
 BASE_URL = "https://json.tarkov.dev"
@@ -110,6 +110,33 @@ class TarkovApiClient:
     def buildTrader(self, raw, traderNames):
         return Trader(id=raw["id"], name=traderNames.get(raw["name"]) or "Unknown trader", imageUrl=raw.get("imageLink") or "")
 
+    # builds the places an objective happens
+    def buildLocations(self, raw):
+        locations = []
+        seen = set()
+
+        def add(location):
+            # map variants repeat the same place
+            key = (location.mapId, round(location.x, 2), round(location.z, 2))
+            if key not in seen:
+                seen.add(key)
+                locations.append(location)
+
+        for zone in raw.get("zones") or []:
+            position = zone.get("position")
+            if not position or not zone.get("map"):
+                continue
+            outline = [(corner["x"], corner["z"]) for corner in zone.get("outline") or []]
+            add(ObjectiveLocation(mapId=self.displayMap(zone["map"]), x=position["x"], z=position["z"],
+                                  bottom=zone.get("bottom"), top=zone.get("top"), outline=outline))
+        for group in raw.get("possibleLocations") or []:
+            if not group.get("map"):
+                continue
+            for position in group.get("positions") or []:
+                add(ObjectiveLocation(mapId=self.displayMap(group["map"]), x=position["x"], z=position["z"],
+                                      bottom=position.get("y"), top=position.get("y")))
+        return locations
+
     # builds objective dataclass
     def buildObjective(self, raw, taskNames):
         mapSet = set()
@@ -118,7 +145,7 @@ class TarkovApiClient:
         mapList = sorted(mapSet)
         return Objective(id=raw["id"], description=taskNames.get(raw["description"]) or "Unknown description",
                          objType=raw["type"], optional=bool(raw.get("optional")), target=raw.get("count") or 1,
-                         mapIds=mapList)
+                         mapIds=mapList, locations=self.buildLocations(raw))
 
     # builds task dataclass
     def buildTask(self, raw, taskNames):
